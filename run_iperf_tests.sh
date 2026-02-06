@@ -113,7 +113,7 @@ while IFS= read -r test_json; do
   if [[ "$preflight_ping" == "true" ]]; then
     if ping -c "$ping_count" -w 5 "$server_host" >/tmp/onslawt_ping.$$ 2>/dev/null; then
       rtt_line=$(grep -E 'min/avg/max' /tmp/onslawt_ping.$$ | tail -n 1 || true)
-      rtt_avg=$(echo "$rtt_line" | sed -n 's/.*= [0-9.]*\/\\([0-9.]*\\)\\/[0-9.]*\\/.*$/\\1/p')
+      rtt_avg=$(echo "$rtt_line" | awk -F'/' '{print $2}' | awk '{print $1}')
     fi
     rm -f /tmp/onslawt_ping.$$
     if [[ -n "$rtt_avg" ]]; then
