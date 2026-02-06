@@ -221,13 +221,13 @@ while IFS= read -r test_json; do
         rtt_avg_ms: ($rtt_avg_ms|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
 
     if [[ "$raw_json_valid" == "true" ]]; then
-      jq -n --argjson meta "$meta" --argjson summary "$summary" --slurpfile result "$parse_file" \
-        '{meta:$meta, summary:$summary, result:$result[0]}' > "$outfile"
+      jq -n --arg meta "$meta" --arg summary "$summary" --slurpfile result "$parse_file" \
+        '{meta: ($meta|fromjson?), summary: ($summary|fromjson?), result:$result[0]}' > "$outfile"
     else
       log "[$name] iperf3 JSON parse failed; saving raw output as text."
       raw_text=$(cat "$rawfile")
-      jq -n --argjson meta "$meta" --argjson summary "$summary" --arg raw "$raw_text" \
-        '{meta:$meta, summary:$summary, raw:$raw}' > "$outfile"
+      jq -n --arg meta "$meta" --arg summary "$summary" --arg raw "$raw_text" \
+        '{meta: ($meta|fromjson?), summary: ($summary|fromjson?), raw:$raw}' > "$outfile"
     fi
 
     rm -f "$cleanfile"
