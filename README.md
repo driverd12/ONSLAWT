@@ -29,6 +29,11 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
    ./run_all.sh
    ```
 
+3a. WAN-only guided run (prompts for Palo vs MX450, generates report + graphs):
+   ```bash
+   ./run_wan_suite.sh
+   ```
+
 4. Compare baseline vs post-upgrade:
    ```bash
    python3 ./analyze_results.py \
@@ -66,6 +71,8 @@ The default run also performs a short preflight `ping` to record average RTT in 
 - `./setup_env.sh` – dependency installer
 - `./run_all.sh` – full suite runner
 - `./run_iperf_tests.sh`
+- `./run_wan_suite.sh` – guided WAN run, prompts for device and generates report
+- `./report_results.py` – builds stats + graphs from a run directory
 - `./refresh_public_tests.sh` – refreshes `tests.json` from the public iperf server list
 - `./update_tests_from_public_list.py` – pulls CSV/JSON list and selects 8 diverse NA servers (10G+)
 - `./run_latency_tests.sh`

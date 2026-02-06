@@ -157,7 +157,7 @@ while IFS= read -r test_json; do
     log "[$name] Running iperf3 ${protocol} ${run_direction} for ${duration}s (P=${parallel})."
     log "[$name] Command: ${cmd[*]}"
     if ! "${cmd[@]}" >"$rawfile" 2>"$errfile"; then
-      log "[$name] iperf3 command failed. See $errfile"
+      log "[$name] iperf3 command failed. stdout=$rawfile stderr=$errfile"
       return 1
     fi
 
