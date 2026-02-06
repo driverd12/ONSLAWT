@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Tuple
 def load_results(run_dir: str) -> List[Dict[str, Any]]:
     rows = []
     for name in os.listdir(run_dir):
-        if not name.startswith("iperf_") or not name.endswith(".json"):
+        if not (name.startswith("iperf_") or name.startswith("adaptive_udp_")) or not name.endswith(".json"):
             continue
         path = os.path.join(run_dir, name)
         try:
@@ -84,6 +84,15 @@ def collect_metrics(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for row in rows:
         meta = row.get("meta", {})
         summary = row.get("summary", {})
+        # Adaptive UDP uses 'selected' for best step
+        if not summary and row.get("selected"):
+            sel = row.get("selected") or {}
+            summary = {
+                "udp_bps": sel.get("throughput_bps"),
+                "udp_jitter_ms": sel.get("jitter_ms"),
+                "udp_lost_percent": sel.get("loss_percent"),
+                "udp_packets": sel.get("packets"),
+            }
         protocol = meta.get("protocol")
         direction = meta.get("direction")
         host = meta.get("server_host")
