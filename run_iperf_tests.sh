@@ -74,6 +74,13 @@ while IFS= read -r test_json; do
   run_iperf=$(config_get "$test_json" '.run_iperf')
   run_timeout_sec=$(config_get "$test_json" '.run_timeout_sec')
   cooldown_sec=$(config_get "$test_json" '.cooldown_sec')
+  adaptive_udp=$(config_get "$test_json" '.adaptive_udp')
+  udp_start_bps=$(config_get "$test_json" '.udp_start_bps')
+  udp_step_bps=$(config_get "$test_json" '.udp_step_bps')
+  udp_max_bps=$(config_get "$test_json" '.udp_max_bps')
+  udp_loss_threshold=$(config_get "$test_json" '.udp_loss_threshold')
+  udp_jitter_threshold=$(config_get "$test_json" '.udp_jitter_threshold')
+  udp_drop_threshold=$(config_get "$test_json" '.udp_drop_threshold')
 
   ssh_user=$(config_get "$test_json" '.server_ssh_user')
   ssh_host=$(config_get "$test_json" '.server_ssh_host')
@@ -112,6 +119,13 @@ while IFS= read -r test_json; do
   if [[ -z "$ping_count" ]]; then ping_count="5"; fi
   if [[ -z "$cooldown_sec" ]]; then cooldown_sec="5"; fi
   if [[ -z "$run_timeout_sec" ]]; then run_timeout_sec="$((duration + 20))"; fi
+  if [[ -z "$adaptive_udp" ]]; then adaptive_udp="false"; fi
+  if [[ -z "$udp_start_bps" ]]; then udp_start_bps="1G"; fi
+  if [[ -z "$udp_step_bps" ]]; then udp_step_bps="1G"; fi
+  if [[ -z "$udp_max_bps" ]]; then udp_max_bps="10G"; fi
+  if [[ -z "$udp_loss_threshold" ]]; then udp_loss_threshold="1.0"; fi
+  if [[ -z "$udp_jitter_threshold" ]]; then udp_jitter_threshold="5.0"; fi
+  if [[ -z "$udp_drop_threshold" ]]; then udp_drop_threshold="5.0"; fi
 
   rtt_avg=""
   if [[ "$preflight_ping" == "true" ]]; then
@@ -147,6 +161,45 @@ while IFS= read -r test_json; do
     local outfile="$OUT_DIR/iperf_${name}_${run_direction}.json"
     local rawfile="$OUT_DIR/iperf_${name}_${run_direction}.raw.json"
     local errfile="$OUT_DIR/iperf_${name}_${run_direction}.stderr.log"
+
+    # Adaptive UDP ramp: steadily increase until pushback, then stop.
+    if [[ "$protocol" == "udp" && "$adaptive_udp" == "true" ]]; then
+      local out_adapt="$OUT_DIR/adaptive_udp_${name}_${run_direction}.json"
+      local meta_json
+      meta_json=$(jq -n \
+        --arg name "$name" \
+        --arg server_host "$server_host" \
+        --arg site "$site" \
+        --arg country "$country" \
+        --arg continent "$continent" \
+        --arg provider "$provider" \
+        --arg gbps "$gbps" \
+        --arg port_range "$port_range" \
+        --arg rtt_avg_ms "$rtt_avg" \
+        '{name:$name, server_host:$server_host, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range, rtt_avg_ms: ($rtt_avg_ms|tonumber?)}')
+
+      log "[$name] Adaptive UDP ramp ${run_direction}: start=${udp_start_bps}, step=${udp_step_bps}, max=${udp_max_bps}."
+      if ! python3 "$SCRIPT_DIR/adaptive_udp.py" \
+        --server "$server_host" \
+        --port "$iperf_port" \
+        --direction "$run_direction" \
+        --duration "$duration" \
+        --parallel "$parallel" \
+        --start "$udp_start_bps" \
+        --step "$udp_step_bps" \
+        --max "$udp_max_bps" \
+        --loss-threshold "$udp_loss_threshold" \
+        --jitter-threshold "$udp_jitter_threshold" \
+        --drop-threshold "$udp_drop_threshold" \
+        --timeout "$run_timeout_sec" \
+        --out "$out_adapt" \
+        --meta "$meta_json"; then
+        log "[$name] Adaptive UDP ramp failed."
+        return 1
+      fi
+      log "[$name] Saved adaptive UDP results to $out_adapt"
+      return 0
+    fi
 
     local cmd=(iperf3 -c "$server_host" -p "$iperf_port" -t "$duration" -P "$parallel" -J)
 
