@@ -161,8 +161,23 @@ while IFS= read -r test_json; do
       return 1
     fi
 
+    # Clean CR characters that can break jq parsing on some systems.
+    local cleanfile="$OUT_DIR/iperf_${name}_${run_direction}.raw.clean.json"
+    tr -d '\r' < "$rawfile" > "$cleanfile" || true
+
+    local parse_file="$rawfile"
+    if [[ -s "$cleanfile" ]]; then
+      parse_file="$cleanfile"
+    fi
+
+    local raw_json_valid="true"
+    if ! jq -e . "$parse_file" >/dev/null 2>&1; then
+      raw_json_valid="false"
+    fi
+
     local summary
-    summary=$(jq -c --arg proto "$protocol" '
+    if [[ "$raw_json_valid" == "true" ]]; then
+      summary=$(jq -c --arg proto "$protocol" '
       def tcp: {
         tcp_sent_bps: (.end.sum_sent.bits_per_second // null),
         tcp_recv_bps: (.end.sum_received.bits_per_second // null),
@@ -175,7 +190,10 @@ while IFS= read -r test_json; do
         udp_packets: (.end.sum.packets // .end.sum_received.packets // null)
       };
       if $proto=="udp" then udp else tcp end
-    ' "$rawfile")
+      ' "$parse_file")
+    else
+      summary=$(jq -n '{}')
+    fi
 
     local meta
     meta=$(jq -n \
@@ -196,13 +214,23 @@ while IFS= read -r test_json; do
       --arg gbps "$gbps" \
       --arg port_range "$port_range" \
       --arg rtt_avg_ms "$rtt_avg" \
+      --arg raw_json_valid "$raw_json_valid" \
       '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
         server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
         notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
-        rtt_avg_ms: ($rtt_avg_ms|tonumber?) }')
+        rtt_avg_ms: ($rtt_avg_ms|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
 
-    jq -n --argjson meta "$meta" --argjson summary "$summary" --slurpfile result "$rawfile" \
-      '{meta:$meta, summary:$summary, result:$result[0]}' > "$outfile"
+    if [[ "$raw_json_valid" == "true" ]]; then
+      jq -n --argjson meta "$meta" --argjson summary "$summary" --slurpfile result "$parse_file" \
+        '{meta:$meta, summary:$summary, result:$result[0]}' > "$outfile"
+    else
+      log "[$name] iperf3 JSON parse failed; saving raw output as text."
+      raw_text=$(cat "$rawfile")
+      jq -n --argjson meta "$meta" --argjson summary "$summary" --arg raw "$raw_text" \
+        '{meta:$meta, summary:$summary, raw:$raw}' > "$outfile"
+    fi
+
+    rm -f "$cleanfile"
 
     log "[$name] Saved iperf3 results to $outfile"
   }
