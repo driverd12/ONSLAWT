@@ -1,0 +1,76 @@
+{
+  "defaults": {
+    "protocol": "tcp",
+    "direction": "bidirectional",
+    "duration": 30,
+    "parallel_streams": 8,
+    "iperf_port": 5201,
+    "udp_bandwidth": "10G",
+    "start_server": false,
+    "run_iperf": true,
+    "run_latency": false,
+    "run_mtr": false,
+    "run_mtu": false,
+    "run_speedtest": false,
+    "ping_count": 20,
+    "ping_interval_ms": 2,
+    "ping_pause_ms": 500,
+    "ping_bursts": 1,
+    "mtr_cycles": 10,
+    "mtu_test": false,
+    "mtu_max_size": 1472,
+    "mtu_min_size": 1200,
+    "server_ssh_user": "",
+    "server_ssh_host": "",
+    "server_ssh_port": 22,
+    "server_ssh_key": "",
+    "server_ssh_opts": ""
+  },
+  "tests": [
+    {
+      "name": "wan_ashburn_clouvider_tcp",
+      "server_host": "ash.speedtest.clouvider.net",
+      "iperf_port": 5201,
+      "protocol": "tcp",
+      "notes": "10G iperf3 server (Clouvider, Ashburn). Ports 5200-5209."
+    },
+    {
+      "name": "wan_ashburn_clouvider_udp",
+      "server_host": "ash.speedtest.clouvider.net",
+      "iperf_port": 5201,
+      "protocol": "udp",
+      "udp_bandwidth": "10G",
+      "notes": "10G iperf3 server (Clouvider, Ashburn). UDP/jitter/loss at 10G."
+    },
+    {
+      "name": "wan_dallas_interserver_tcp",
+      "server_host": "dfw.speedtest.is.cc",
+      "iperf_port": 5202,
+      "protocol": "tcp",
+      "notes": "100G iperf3 server (InterServer, Dallas). Ports 5202-5210."
+    },
+    {
+      "name": "wan_dallas_interserver_udp",
+      "server_host": "dfw.speedtest.is.cc",
+      "iperf_port": 5202,
+      "protocol": "udp",
+      "udp_bandwidth": "10G",
+      "notes": "100G iperf3 server (InterServer, Dallas). UDP/jitter/loss at 10G."
+    },
+    {
+      "name": "wan_sfo_leaseweb_tcp",
+      "server_host": "speedtest.sfo12.us.leaseweb.net",
+      "iperf_port": 5201,
+      "protocol": "tcp",
+      "notes": "10G iperf3 server (LeaseWeb, San Francisco). Ports 5201-5210."
+    },
+    {
+      "name": "wan_sfo_leaseweb_udp",
+      "server_host": "speedtest.sfo12.us.leaseweb.net",
+      "iperf_port": 5201,
+      "protocol": "udp",
+      "udp_bandwidth": "10G",
+      "notes": "10G iperf3 server (LeaseWeb, San Francisco). UDP/jitter/loss at 10G."
+    }
+  ]
+}
