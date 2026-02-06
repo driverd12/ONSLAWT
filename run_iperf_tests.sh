@@ -9,6 +9,7 @@ CONFIG_PATH="$SCRIPT_DIR/tests.json"
 OUT_BASE="$SCRIPT_DIR/results"
 RUN_ID=""
 ONLY_TEST=""
+AUTO_REFRESH="${AUTO_REFRESH:-1}"
 
 usage() {
   cat <<USAGE
@@ -31,6 +32,16 @@ require_cmd jq
 require_cmd iperf3
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
+  # Attempt to auto-refresh if configured.
+  if [[ "$AUTO_REFRESH" == "1" && -x "$SCRIPT_DIR/update_tests_from_public_list.py" ]]; then
+    log "Config not found. Attempting to refresh public server list..."
+    if python3 "$SCRIPT_DIR/update_tests_from_public_list.py" --count 8 --continent "North America" --min-gbps 10 --udp-bandwidth "10G" --out "$CONFIG_PATH" --cache-dir "$SCRIPT_DIR/data"; then
+      log "Refreshed tests.json."
+    fi
+  fi
+fi
+
+if [[ ! -f "$CONFIG_PATH" ]]; then
   die "Config not found: $CONFIG_PATH"
 fi
 
@@ -41,6 +52,14 @@ fi
 ensure_out_dir "$OUT_BASE" "$RUN_ID"
 
 log "Starting iperf3 tests using config: $CONFIG_PATH"
+if [[ "$AUTO_REFRESH" == "1" && -x "$SCRIPT_DIR/update_tests_from_public_list.py" ]]; then
+  log "AUTO_REFRESH=1, refreshing public server list before run..."
+  if python3 "$SCRIPT_DIR/update_tests_from_public_list.py" --count 8 --continent "North America" --min-gbps 10 --udp-bandwidth "10G" --out "$CONFIG_PATH" --cache-dir "$SCRIPT_DIR/data"; then
+    log "Refreshed tests.json from public list."
+  else
+    log "Refresh failed; proceeding with existing tests.json."
+  fi
+fi
 
 while IFS= read -r test_json; do
   name=$(config_get "$test_json" '.name')
@@ -59,6 +78,16 @@ while IFS= read -r test_json; do
   ssh_port=$(config_get "$test_json" '.server_ssh_port')
   ssh_key=$(config_get "$test_json" '.server_ssh_key')
   ssh_opts=$(config_get "$test_json" '.server_ssh_opts')
+  preflight_ping=$(config_get "$test_json" '.preflight_ping')
+  ping_count=$(config_get "$test_json" '.ping_count')
+
+  notes=$(config_get "$test_json" '.notes')
+  site=$(config_get "$test_json" '.site')
+  country=$(config_get "$test_json" '.country')
+  continent=$(config_get "$test_json" '.continent')
+  provider=$(config_get "$test_json" '.provider')
+  gbps=$(config_get "$test_json" '.gbps')
+  port_range=$(config_get "$test_json" '.port_range')
 
   if [[ -z "$name" || -z "$server_host" ]]; then
     log "Skipping test with missing name or server_host."
@@ -77,6 +106,22 @@ while IFS= read -r test_json; do
   if [[ -z "$iperf_port" ]]; then iperf_port="5201"; fi
   if [[ -z "$udp_bandwidth" ]]; then udp_bandwidth="0"; fi
   if [[ -z "$start_server" ]]; then start_server="true"; fi
+  if [[ -z "$preflight_ping" ]]; then preflight_ping="true"; fi
+  if [[ -z "$ping_count" ]]; then ping_count="5"; fi
+
+  rtt_avg=""
+  if [[ "$preflight_ping" == "true" ]]; then
+    if ping -c "$ping_count" -w 5 "$server_host" >/tmp/onslawt_ping.$$ 2>/dev/null; then
+      rtt_line=$(grep -E 'min/avg/max' /tmp/onslawt_ping.$$ | tail -n 1 || true)
+      rtt_avg=$(echo "$rtt_line" | sed -n 's/.*= [0-9.]*\/\\([0-9.]*\\)\\/[0-9.]*\\/.*$/\\1/p')
+    fi
+    rm -f /tmp/onslawt_ping.$$
+    if [[ -n "$rtt_avg" ]]; then
+      log "[$name] Preflight RTT avg ms: $rtt_avg"
+    else
+      log "[$name] Preflight RTT avg ms: n/a"
+    fi
+  fi
 
   # Only attempt SSH start if SSH info is explicitly provided (ignore default port alone).
   if [[ -n "$ssh_user" || -n "$ssh_host" || -n "$ssh_key" || -n "$ssh_opts" ]]; then
@@ -143,8 +188,18 @@ while IFS= read -r test_json; do
       --arg duration "$duration" \
       --arg parallel_streams "$parallel" \
       --arg iperf_port "$iperf_port" \
+      --arg notes "$notes" \
+      --arg site "$site" \
+      --arg country "$country" \
+      --arg continent "$continent" \
+      --arg provider "$provider" \
+      --arg gbps "$gbps" \
+      --arg port_range "$port_range" \
+      --arg rtt_avg_ms "$rtt_avg" \
       '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
-        server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber }')
+        server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
+        notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
+        rtt_avg_ms: ($rtt_avg_ms|tonumber?) }')
 
     jq -n --argjson meta "$meta" --argjson summary "$summary" --slurpfile result "$rawfile" \
       '{meta:$meta, summary:$summary, result:$result[0]}' > "$outfile"

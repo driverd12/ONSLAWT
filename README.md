@@ -18,7 +18,11 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
    ```
    If your system blocks `pip` installs (PEP 668), that's OK — `speedtest-cli` is optional for WAN throughput. The rest of the suite will work without it.
 
-2. Edit `tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
+2. Refresh the public iperf3 list (North America, 10G+, 8 diverse servers):
+   ```bash
+   ./refresh_public_tests.sh
+   ```
+   This pulls the latest CSV/JSON list and regenerates `tests.json`.
 
 3. Run the full suite:
    ```bash
@@ -56,11 +60,14 @@ ONSLAWT only attempts to start `iperf3 -s` via SSH when you provide SSH fields i
 
 ### WAN-only defaults
 The current `tests.json` is set up for WAN-only iperf3 testing with 10G+ public servers. Latency/mtr/MTU/speedtest are disabled by default for a simpler throughput-focused run. You can re-enable those per test if desired.
+The default run also performs a short preflight `ping` to record average RTT in each iperf result (as a distance indicator).
 
 ## Scripts
 - `./setup_env.sh` – dependency installer
 - `./run_all.sh` – full suite runner
 - `./run_iperf_tests.sh`
+- `./refresh_public_tests.sh` – refreshes `tests.json` from the public iperf server list
+- `./update_tests_from_public_list.py` – pulls CSV/JSON list and selects 8 diverse NA servers (10G+)
 - `./run_latency_tests.sh`
 - `./run_mtr.sh`
 - `./run_mtu_tests.sh`
