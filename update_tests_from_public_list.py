@@ -295,7 +295,7 @@ def main() -> int:
             "ping_pause_ms": 200,
             "ping_bursts": 1,
             "mtr_cycles": 10,
-            "mtu_test": false,
+            "mtu_test": False,
             "mtu_max_size": 1472,
             "mtu_min_size": 1200,
             "server_ssh_user": "",
