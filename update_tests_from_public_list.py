@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.request import Request, urlopen
 
@@ -268,7 +268,7 @@ def main() -> int:
         "meta": {
             "source_json": JSON_URL,
             "source_csv": CSV_URL,
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "criteria": {
                 "continent": args.continent,
                 "min_gbps": args.min_gbps,
@@ -283,13 +283,13 @@ def main() -> int:
             "parallel_streams": 8,
             "iperf_port": 5201,
             "udp_bandwidth": args.udp_bandwidth,
-            "start_server": false,
-            "run_iperf": true,
-            "run_latency": false,
-            "run_mtr": false,
-            "run_mtu": false,
-            "run_speedtest": false,
-            "preflight_ping": true,
+            "start_server": False,
+            "run_iperf": True,
+            "run_latency": False,
+            "run_mtr": False,
+            "run_mtu": False,
+            "run_speedtest": False,
+            "preflight_ping": True,
             "ping_count": 5,
             "ping_interval_ms": 200,
             "ping_pause_ms": 200,
