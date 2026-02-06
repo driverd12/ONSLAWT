@@ -14,22 +14,22 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
 ## Quick Start
 1. Install dependencies on the jump host:
    ```bash
-   ~/ONSLAWT/setup_env.sh
+   ./setup_env.sh
    ```
 
-2. Edit `~ONSLAWT/tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
+2. Edit `tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
 
 3. Run the full suite:
    ```bash
-   ~/ONSLAWT/run_all.sh
+   ./run_all.sh
    ```
 
 4. Compare baseline vs post-upgrade:
    ```bash
-   python3 ~/ONSLAWT/analyze_results.py \
-     --baseline ~/ONSLAWT/results/20240206_090000 \
-     --post ~/ONSLAWT/results/20240207_090000 \
-     --out ~/ONSLAWT/results/compare.md
+   python3 ./analyze_results.py \
+     --baseline ./results/20240206_090000 \
+     --post ./results/20240207_090000 \
+     --out ./results/compare.md
    ```
 
 ## Configuration (`tests.json`)
@@ -57,14 +57,14 @@ ONSLAWT only attempts to start `iperf3 -s` via SSH when you provide SSH fields i
 The current `tests.json` is set up for WAN-only iperf3 testing with 10G+ public servers. Latency/mtr/MTU/speedtest are disabled by default for a simpler throughput-focused run. You can re-enable those per test if desired.
 
 ## Scripts
-- `~ONSLAWT/setup_env.sh` – dependency installer
-- `~ONSLAWT/run_all.sh` – full suite runner
-- `~ONSLAWT/run_iperf_tests.sh`
-- `~ONSLAWT/run_latency_tests.sh`
-- `~ONSLAWT/run_mtr.sh`
-- `~ONSLAWT/run_mtu_tests.sh`
-- `~ONSLAWT/run_speedtest.sh`
-- `~ONSLAWT/analyze_results.py`
+- `./setup_env.sh` – dependency installer
+- `./run_all.sh` – full suite runner
+- `./run_iperf_tests.sh`
+- `./run_latency_tests.sh`
+- `./run_mtr.sh`
+- `./run_mtu_tests.sh`
+- `./run_speedtest.sh`
+- `./analyze_results.py`
 
 ## Output Layout
 Results are stored under `results/<run_id>/`:
@@ -74,7 +74,7 @@ Results are stored under `results/<run_id>/`:
 - `mtu_<name>.json`
 - `speedtest_<name>.json`
 - `run.log`
- - `iperf_<name>_<direction>.stderr.log` (only if iperf emits errors)
+- `iperf_<name>_<direction>.stderr.log` (only if iperf emits errors)
 
 ## Operational Notes
 - ICMP bursts are short by default (`20` packets at `2ms` intervals) to reduce IDS/IPS false positives. Adjust `ping_interval_ms` and `ping_bursts` as needed.
@@ -82,6 +82,6 @@ Results are stored under `results/<run_id>/`:
 - Always run baseline tests at consistent times (e.g., peak and off-peak) for better comparisons.
 
 ## Next Steps
-- Populate `tests.json` with your IronBird/HQ4 endpoints, VPN targets, and WAN IPs.
-- Run baseline tests before the firewall cutover, then re-run after installing the Meraki MX450.
+- Populate `tests.json` with the WAN iperf3 targets you want to baseline.
+- Run baseline tests before the firewall cutover, then re-run after installing the Meraki MX450 using the same test list.
 - Use `analyze_results.py` to quantify improvements and regressions.
