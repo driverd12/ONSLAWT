@@ -14,14 +14,14 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
 ## Quick Start
 1. Install dependencies on the jump host:
    ```bash
-   /Users/dan.driver/Cursor_projects/bash/ONSLAWT/setup_env.sh
+   ~/ONSLAWT/setup_env.sh
    ```
 
-2. Edit `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
+2. Edit `~ONSLAWT/tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
 
 3. Run the full suite:
    ```bash
-   /Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_all.sh
+   ~/ONSLAWT/run_all.sh
    ```
 
 4. Compare baseline vs post-upgrade:
@@ -57,14 +57,14 @@ ONSLAWT only attempts to start `iperf3 -s` via SSH when you provide SSH fields i
 The current `tests.json` is set up for WAN-only iperf3 testing with 10G+ public servers. Latency/mtr/MTU/speedtest are disabled by default for a simpler throughput-focused run. You can re-enable those per test if desired.
 
 ## Scripts
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/setup_env.sh` – dependency installer
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_all.sh` – full suite runner
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_iperf_tests.sh`
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_latency_tests.sh`
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_mtr.sh`
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_mtu_tests.sh`
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/run_speedtest.sh`
-- `/Users/dan.driver/Cursor_projects/bash/ONSLAWT/analyze_results.py`
+- `~ONSLAWT/setup_env.sh` – dependency installer
+- `~ONSLAWT/run_all.sh` – full suite runner
+- `~ONSLAWT/run_iperf_tests.sh`
+- `~ONSLAWT/run_latency_tests.sh`
+- `~ONSLAWT/run_mtr.sh`
+- `~ONSLAWT/run_mtu_tests.sh`
+- `~ONSLAWT/run_speedtest.sh`
+- `~ONSLAWT/analyze_results.py`
 
 ## Output Layout
 Results are stored under `results/<run_id>/`:
