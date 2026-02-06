@@ -72,6 +72,8 @@ while IFS= read -r test_json; do
   udp_bandwidth=$(config_get "$test_json" '.udp_bandwidth')
   start_server=$(config_get "$test_json" '.start_server')
   run_iperf=$(config_get "$test_json" '.run_iperf')
+  run_timeout_sec=$(config_get "$test_json" '.run_timeout_sec')
+  cooldown_sec=$(config_get "$test_json" '.cooldown_sec')
 
   ssh_user=$(config_get "$test_json" '.server_ssh_user')
   ssh_host=$(config_get "$test_json" '.server_ssh_host')
@@ -108,6 +110,8 @@ while IFS= read -r test_json; do
   if [[ -z "$start_server" ]]; then start_server="true"; fi
   if [[ -z "$preflight_ping" ]]; then preflight_ping="true"; fi
   if [[ -z "$ping_count" ]]; then ping_count="5"; fi
+  if [[ -z "$cooldown_sec" ]]; then cooldown_sec="5"; fi
+  if [[ -z "$run_timeout_sec" ]]; then run_timeout_sec="$((duration + 20))"; fi
 
   rtt_avg=""
   if [[ "$preflight_ping" == "true" ]]; then
@@ -156,8 +160,48 @@ while IFS= read -r test_json; do
 
     log "[$name] Running iperf3 ${protocol} ${run_direction} for ${duration}s (P=${parallel})."
     log "[$name] Command: ${cmd[*]}"
-    if ! "${cmd[@]}" >"$rawfile" 2>"$errfile"; then
-      log "[$name] iperf3 command failed. stdout=$rawfile stderr=$errfile"
+    local timeout_cmd=()
+    if command -v timeout >/dev/null 2>&1; then
+      timeout_cmd=(timeout "${run_timeout_sec}")
+    fi
+
+    if ! "${timeout_cmd[@]}" "${cmd[@]}" >"$rawfile" 2>"$errfile"; then
+      local exit_code=$?
+      if [[ "$exit_code" -eq 124 ]]; then
+        log "[$name] iperf3 command timed out after ${run_timeout_sec}s. stdout=$rawfile stderr=$errfile"
+      else
+        log "[$name] iperf3 command failed (exit $exit_code). stdout=$rawfile stderr=$errfile"
+      fi
+
+      # Write a minimal result so reports can include failures.
+      local ts_fail
+      ts_fail=$(date -Iseconds)
+      local meta_fail
+      meta_fail=$(jq -n \
+        --arg name "$name" \
+        --arg tool "iperf3" \
+        --arg protocol "$protocol" \
+        --arg direction "$run_direction" \
+        --arg timestamp "$ts_fail" \
+        --arg server_host "$server_host" \
+        --arg duration "$duration" \
+        --arg parallel_streams "$parallel" \
+        --arg iperf_port "$iperf_port" \
+        --arg notes "$notes" \
+        --arg site "$site" \
+        --arg country "$country" \
+        --arg continent "$continent" \
+        --arg provider "$provider" \
+        --arg gbps "$gbps" \
+        --arg port_range "$port_range" \
+        --arg rtt_avg_ms "$rtt_avg" \
+        --arg raw_json_valid "false" \
+        --arg error "iperf_failed" \
+        '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
+          server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
+          notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
+          rtt_avg_ms: ($rtt_avg_ms|tonumber?), raw_json_valid: false, error:$error }')
+      jq -n --arg meta "$meta_fail" '{meta: ($meta|fromjson?), summary:{}, raw:""}' > "$outfile"
       return 1
     fi
 
@@ -238,17 +282,22 @@ while IFS= read -r test_json; do
   case "$direction" in
     uplink)
       run_one "uplink" || true
+      sleep "$cooldown_sec"
       ;;
     downlink)
       run_one "downlink" || true
+      sleep "$cooldown_sec"
       ;;
     bidirectional)
       run_one "uplink" || true
+      sleep "$cooldown_sec"
       run_one "downlink" || true
+      sleep "$cooldown_sec"
       ;;
     *)
       log "[$name] Unknown direction '$direction'; defaulting to uplink."
       run_one "uplink" || true
+      sleep "$cooldown_sec"
       ;;
   esac
 

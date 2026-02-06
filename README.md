@@ -33,6 +33,7 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
    ```bash
    ./run_wan_suite.sh
    ```
+   This uses a lower, firewall-friendly load profile by default (15s, P=4, UDP 5G) and enforces per-test timeouts plus cooldowns.
 
 4. Compare baseline vs post-upgrade:
    ```bash
