@@ -11,32 +11,55 @@ install_with_apt() {
   log "Installing dependencies with apt..."
   sudo apt-get update -y
   sudo apt-get install -y iperf3 mtr fping jq iputils-tracepath python3 python3-pip
-  if ! command -v speedtest-cli >/dev/null 2>&1; then
-    sudo pip3 install speedtest-cli
+
+  if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
+    if sudo apt-get install -y speedtest-cli >/dev/null 2>&1; then
+      log "Installed speedtest-cli via apt."
+    elif sudo apt-get install -y python3-speedtest-cli >/dev/null 2>&1; then
+      log "Installed python3-speedtest-cli via apt."
+    else
+      log "Speedtest CLI not available via apt; skipping. (Optional for WAN throughput tests)"
+      log "If you need it, install with pipx or a venv."
+    fi
   fi
 }
 
 install_with_dnf() {
   log "Installing dependencies with dnf..."
   sudo dnf install -y iperf3 mtr fping jq iputils python3 python3-pip
-  if ! command -v speedtest-cli >/dev/null 2>&1; then
-    sudo pip3 install speedtest-cli
+  if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
+    if sudo dnf install -y speedtest-cli >/dev/null 2>&1; then
+      log "Installed speedtest-cli via dnf."
+    else
+      log "Speedtest CLI not available via dnf; skipping. (Optional for WAN throughput tests)"
+      log "If you need it, install with pipx or a venv."
+    fi
   fi
 }
 
 install_with_yum() {
   log "Installing dependencies with yum..."
   sudo yum install -y iperf3 mtr fping jq iputils python3 python3-pip
-  if ! command -v speedtest-cli >/dev/null 2>&1; then
-    sudo pip3 install speedtest-cli
+  if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
+    if sudo yum install -y speedtest-cli >/dev/null 2>&1; then
+      log "Installed speedtest-cli via yum."
+    else
+      log "Speedtest CLI not available via yum; skipping. (Optional for WAN throughput tests)"
+      log "If you need it, install with pipx or a venv."
+    fi
   fi
 }
 
 install_with_pacman() {
   log "Installing dependencies with pacman..."
   sudo pacman -Sy --noconfirm iperf3 mtr fping jq iputils python python-pip
-  if ! command -v speedtest-cli >/dev/null 2>&1; then
-    sudo pip install speedtest-cli
+  if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
+    if sudo pacman -Sy --noconfirm speedtest-cli >/dev/null 2>&1; then
+      log "Installed speedtest-cli via pacman."
+    else
+      log "Speedtest CLI not available via pacman; skipping. (Optional for WAN throughput tests)"
+      log "If you need it, install with pipx or a venv."
+    fi
   fi
 }
 

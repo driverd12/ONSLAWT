@@ -16,6 +16,7 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
    ```bash
    ./setup_env.sh
    ```
+   If your system blocks `pip` installs (PEP 668), that's OK — `speedtest-cli` is optional for WAN throughput. The rest of the suite will work without it.
 
 2. Edit `tests.json` with your WAN iperf3 servers (or internal endpoints if you re-enable LAN tests).
 
