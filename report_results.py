@@ -359,6 +359,22 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
                 f"| {s['host']} | {s['direction']} | {j:.3f} | {l:.3f} |" if j is not None and l is not None else f"| {s['host']} | {s['direction']} | n/a | n/a |"
             )
 
+    # Overall summary by protocol+direction
+    lines.append("")
+    lines.append("## Overall Summary (All Endpoints)")
+    lines.append("| Protocol | Direction | Mean | Median | Min | Max | P10 | P90 | Outliers |")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+    by_pd: Dict[tuple, List[float]] = {}
+    for m in metrics:
+        key = (m.get("protocol"), m.get("direction"))
+        if m.get("throughput_bps") is not None:
+            by_pd.setdefault(key, []).append(m.get("throughput_bps"))
+    for (proto, direction), vals in by_pd.items():
+        s = summarize(vals)
+        lines.append(
+            f"| {proto} | {direction} | {fmt_bps(s['mean'])} | {fmt_bps(s['median'])} | {fmt_bps(s['min'])} | {fmt_bps(s['max'])} | {fmt_bps(s['p10'])} | {fmt_bps(s['p90'])} | {len(s['outliers'])} |"
+        )
+
     # Graphs
     assets_dir = os.path.join(run_dir, "report_assets")
     os.makedirs(assets_dir, exist_ok=True)

@@ -32,7 +32,11 @@ if [[ -x "$SCRIPT_DIR/refresh_public_tests.sh" ]]; then
   "$SCRIPT_DIR/refresh_public_tests.sh"
 fi
 
-"$SCRIPT_DIR/run_iperf_tests.sh" -r "$RUN_ID"
+if [[ "${PARALLEL_JOBS:-2}" -gt 1 ]]; then
+  "$SCRIPT_DIR/run_iperf_parallel.sh" -r "$RUN_ID"
+else
+  "$SCRIPT_DIR/run_iperf_tests.sh" -r "$RUN_ID"
+fi
 
 python3 "$SCRIPT_DIR/report_results.py" --run-dir "$SCRIPT_DIR/results/$RUN_ID" --device "$DEVICE_LABEL"
 

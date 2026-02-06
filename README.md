@@ -35,6 +35,10 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
    ```
    This uses a lower, firewall-friendly load profile by default (15s, P=4) and enforces per-test timeouts plus cooldowns.
    UDP tests are adaptive: they ramp up toward 10G and fall back when quality degrades.
+   To run endpoints in parallel (faster), set `PARALLEL_JOBS` (default 2):
+   ```bash
+   PARALLEL_JOBS=2 ./run_wan_suite.sh
+   ```
 
 4. Compare baseline vs post-upgrade:
    ```bash
@@ -73,6 +77,7 @@ The default run also performs a short preflight `ping` to record average RTT in 
 - `./setup_env.sh` – dependency installer
 - `./run_all.sh` – full suite runner
 - `./run_iperf_tests.sh`
+- `./run_iperf_parallel.sh` – parallel runner across endpoints (uses `PARALLEL_JOBS`)
 - `./run_wan_suite.sh` – guided WAN run, prompts for device and generates report
 - `./report_results.py` – builds stats + graphs from a run directory
 - `./refresh_public_tests.sh` – refreshes `tests.json` from the public iperf server list
