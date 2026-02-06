@@ -26,10 +26,10 @@ ONSLAWT is a Bash/Python toolkit for capturing baseline and post-upgrade network
 
 4. Compare baseline vs post-upgrade:
    ```bash
-   python3 /Users/dan.driver/Cursor_projects/bash/ONSLAWT/analyze_results.py \
-     --baseline /Users/dan.driver/Cursor_projects/bash/ONSLAWT/results/20240206_090000 \
-     --post /Users/dan.driver/Cursor_projects/bash/ONSLAWT/results/20240207_090000 \
-     --out /Users/dan.driver/Cursor_projects/bash/ONSLAWT/results/compare.md
+   python3 ~/ONSLAWT/analyze_results.py \
+     --baseline ~/ONSLAWT/results/20240206_090000 \
+     --post ~/ONSLAWT/results/20240207_090000 \
+     --out ~/ONSLAWT/results/compare.md
    ```
 
 ## Configuration (`tests.json`)
