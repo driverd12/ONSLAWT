@@ -128,16 +128,27 @@ while IFS= read -r test_json; do
   if [[ -z "$udp_drop_threshold" ]]; then udp_drop_threshold="5.0"; fi
 
   rtt_avg=""
+  ttl_avg=""
+  preflight_loss=""
   if [[ "$preflight_ping" == "true" ]]; then
     if ping -c "$ping_count" -w 5 "$server_host" >/tmp/onslawt_ping.$$ 2>/dev/null; then
       rtt_line=$(grep -E 'min/avg/max' /tmp/onslawt_ping.$$ | tail -n 1 || true)
-      rtt_avg=$(echo "$rtt_line" | awk -F'/' '{print $2}' | awk '{print $1}')
+      rtt_avg=$(echo "$rtt_line" | awk -F'=' '{print $2}' | awk -F'/' '{print $2}' | awk '{print $1}')
+      ttl_avg=$(grep -o 'ttl=[0-9]*' /tmp/onslawt_ping.$$ | cut -d= -f2 | awk '{sum+=$1; n++} END{if(n>0) printf "%.1f", sum/n; else print ""}')
+      loss_line=$(grep -E 'packet loss' /tmp/onslawt_ping.$$ | tail -n 1 || true)
+      preflight_loss=$(echo "$loss_line" | sed -n 's/.*\\([0-9.]*\\)% packet loss.*/\\1/p')
     fi
     rm -f /tmp/onslawt_ping.$$
     if [[ -n "$rtt_avg" ]]; then
       log "[$name] Preflight RTT avg ms: $rtt_avg"
     else
       log "[$name] Preflight RTT avg ms: n/a"
+    fi
+    if [[ -n "$ttl_avg" ]]; then
+      log "[$name] Preflight TTL avg: $ttl_avg"
+    fi
+    if [[ -n "$preflight_loss" ]]; then
+      log "[$name] Preflight loss %: $preflight_loss"
     fi
   fi
 
@@ -311,11 +322,13 @@ while IFS= read -r test_json; do
       --arg gbps "$gbps" \
       --arg port_range "$port_range" \
       --arg rtt_avg_ms "$rtt_avg" \
+      --arg ttl_avg "$ttl_avg" \
+      --arg preflight_loss "$preflight_loss" \
       --arg raw_json_valid "$raw_json_valid" \
       '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
         server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
         notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
-        rtt_avg_ms: ($rtt_avg_ms|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
+        rtt_avg_ms: ($rtt_avg_ms|tonumber?), ttl_avg: ($ttl_avg|tonumber?), preflight_loss: ($preflight_loss|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
 
     if [[ "$raw_json_valid" == "true" ]]; then
       jq -n --arg meta "$meta" --arg summary "$summary" --slurpfile result "$parse_file" \

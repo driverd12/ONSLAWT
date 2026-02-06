@@ -21,10 +21,13 @@ def load_results(run_dir: str) -> List[Dict[str, Any]]:
 
         meta = data.get("meta", {})
         summary = data.get("summary", {})
+        selected = data.get("selected")
         rows.append({
             "path": path,
             "meta": meta,
             "summary": summary,
+            "selected": selected,
+            "data": data,
         })
     return rows
 
@@ -84,6 +87,7 @@ def collect_metrics(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for row in rows:
         meta = row.get("meta", {})
         summary = row.get("summary", {})
+        error = meta.get("error") or row.get("data", {}).get("error")
         # Adaptive UDP uses 'selected' for best step
         if not summary and row.get("selected"):
             sel = row.get("selected") or {}
@@ -99,6 +103,8 @@ def collect_metrics(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         name = meta.get("name")
 
         rtt = safe_float(meta.get("rtt_avg_ms"))
+        ttl = safe_float(meta.get("ttl_avg"))
+        pfl = safe_float(meta.get("preflight_loss"))
         provider = meta.get("provider")
         site = meta.get("site")
         country = meta.get("country")
@@ -125,10 +131,13 @@ def collect_metrics(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "jitter_ms": jitter,
             "loss_percent": loss,
             "rtt_avg_ms": rtt,
+            "ttl_avg": ttl,
+            "preflight_loss": pfl,
             "provider": provider,
             "site": site,
             "country": country,
             "continent": continent,
+            "error": error,
         })
     return metrics
 
@@ -196,6 +205,8 @@ def build_tables(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
         host, protocol, direction = key
         tvals = [r["throughput_bps"] for r in rows if r["throughput_bps"] is not None]
         rttvals = [r["rtt_avg_ms"] for r in rows if r["rtt_avg_ms"] is not None]
+        ttlvals = [r["ttl_avg"] for r in rows if r["ttl_avg"] is not None]
+        pflvals = [r["preflight_loss"] for r in rows if r["preflight_loss"] is not None]
         jvals = [r["jitter_ms"] for r in rows if r["jitter_ms"] is not None]
         lvals = [r["loss_percent"] for r in rows if r["loss_percent"] is not None]
 
@@ -209,6 +220,8 @@ def build_tables(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
             "continent": rows[0].get("continent"),
             "throughput": summarize(tvals),
             "rtt": summarize(rttvals),
+            "ttl": summarize(ttlvals),
+            "preflight_loss": summarize(pflvals),
             "jitter": summarize(jvals),
             "loss": summarize(lvals),
         }
@@ -297,6 +310,103 @@ def svg_scatter(items: List[Dict[str, Any]], title: str, out_path: str):
         f.write("\n".join(lines))
 
 
+def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]], metrics: List[Dict[str, Any]], graphs: List[Tuple[str, str]]):
+    html_path = os.path.join(run_dir, "report.html")
+    lines = []
+    lines.append("<!doctype html>")
+    lines.append("<html><head><meta charset='utf-8'/>")
+    lines.append("<style>")
+    lines.append("body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}")
+    lines.append("h1,h2{margin:0.4em 0}")
+    lines.append("table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}")
+    lines.append("th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}")
+    lines.append("th{background:#f5f5f5}")
+    lines.append(".meta{margin-bottom:16px}")
+    lines.append("</style></head><body>")
+
+    lines.append("<h1>ONSLAWT Report</h1>")
+    lines.append(f"<div class='meta'><strong>Device:</strong> {device}<br/><strong>Run directory:</strong> {run_dir}</div>")
+
+    # Per-endpoint summary table
+    lines.append("<h2>Per-Endpoint Summary (Throughput)</h2>")
+    lines.append("<table><tr><th>Host</th><th>Protocol</th><th>Direction</th><th>Site</th><th>Provider</th>"
+                 "<th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>P10</th><th>P90</th><th>Outliers</th>"
+                 "<th>RTT Mean</th><th>TTL Mean</th><th>Ping Loss %</th></tr>")
+    for s in summaries:
+        t = s["throughput"]
+        r = s["rtt"]
+        ttl = s["ttl"]
+        pfl = s["preflight_loss"]
+        rtt_str = f"{r['mean']:.3f} ms" if r["mean"] is not None else "n/a"
+        ttl_str = f"{ttl['mean']:.1f}" if ttl["mean"] is not None else "n/a"
+        pfl_str = f"{pfl['mean']:.2f}%" if pfl["mean"] is not None else "n/a"
+        lines.append(
+            "<tr>"
+            f"<td>{s['host']}</td>"
+            f"<td>{s['protocol']}</td>"
+            f"<td>{s['direction']}</td>"
+            f"<td>{s.get('site') or '-'}</td>"
+            f"<td>{s.get('provider') or '-'}</td>"
+            f"<td>{fmt_bps(t['mean'])}</td>"
+            f"<td>{fmt_bps(t['median'])}</td>"
+            f"<td>{fmt_bps(t['min'])}</td>"
+            f"<td>{fmt_bps(t['max'])}</td>"
+            f"<td>{fmt_bps(t['p10'])}</td>"
+            f"<td>{fmt_bps(t['p90'])}</td>"
+            f"<td>{len(t['outliers'])}</td>"
+            f"<td>{rtt_str}</td>"
+            f"<td>{ttl_str}</td>"
+            f"<td>{pfl_str}</td>"
+            "</tr>"
+        )
+    lines.append("</table>")
+
+    # Overall summary
+    lines.append("<h2>Overall Summary (All Endpoints)</h2>")
+    lines.append("<table><tr><th>Protocol</th><th>Direction</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>P10</th><th>P90</th><th>Outliers</th></tr>")
+    by_pd: Dict[tuple, List[float]] = {}
+    for m in metrics:
+        key = (m.get("protocol"), m.get("direction"))
+        if m.get("throughput_bps") is not None:
+            by_pd.setdefault(key, []).append(m.get("throughput_bps"))
+    for (proto, direction), vals in by_pd.items():
+        s = summarize(vals)
+        lines.append(
+            f"<tr><td>{proto}</td><td>{direction}</td>"
+            f"<td>{fmt_bps(s['mean'])}</td><td>{fmt_bps(s['median'])}</td>"
+            f"<td>{fmt_bps(s['min'])}</td><td>{fmt_bps(s['max'])}</td>"
+            f"<td>{fmt_bps(s['p10'])}</td><td>{fmt_bps(s['p90'])}</td>"
+            f"<td>{len(s['outliers'])}</td></tr>"
+        )
+    lines.append("</table>")
+
+    # UDP jitter/loss
+    udp_rows = [s for s in summaries if s["protocol"] == "udp"]
+    if udp_rows:
+        lines.append("<h2>UDP Jitter/Loss</h2>")
+        lines.append("<table><tr><th>Host</th><th>Direction</th><th>Jitter Mean (ms)</th><th>Loss Mean (%)</th></tr>")
+        for s in udp_rows:
+            j = s["jitter"]["mean"]
+            l = s["loss"]["mean"]
+            lines.append(
+                f"<tr><td>{s['host']}</td><td>{s['direction']}</td>"
+                f"<td>{f'{j:.3f}' if j is not None else 'n/a'}</td>"
+                f"<td>{f'{l:.3f}' if l is not None else 'n/a'}</td></tr>"
+            )
+        lines.append("</table>")
+
+    # Graphs
+    if graphs:
+        lines.append("<h2>Graphs</h2>")
+        for title, path in graphs:
+            lines.append(f"<div><strong>{title}</strong><br/><img src='{path}' style='max-width:100%;' /></div><br/>")
+
+    lines.append("</body></html>")
+
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
 def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summaries: List[Dict[str, Any]], out_path: str):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
@@ -306,16 +416,28 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
     lines.append(f"Device: **{device}**")
     lines.append(f"Run directory: `{run_dir}`")
     lines.append("")
+    total_samples = len(metrics)
+    good_samples = len([m for m in metrics if m.get("throughput_bps") is not None])
+    failures = [m for m in metrics if m.get("throughput_bps") is None]
+    lines.append(f"Samples: **{good_samples}/{total_samples}** with throughput data. Failures: **{len(failures)}**.")
+    if failures:
+        fail_list = ", ".join([f"{m.get('host','?')} ({m.get('protocol','?')} {m.get('direction','?')})" for m in failures[:8]])
+        lines.append(f"Failures (first 8): {fail_list}")
+    if good_samples == 0:
+        lines.append("No throughput data was captured. Check iperf errors in run.log and reduce load or parallelism.")
+    lines.append("")
 
     # Summary table
     lines.append("## Per-Endpoint Summary (Throughput)")
-    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | P10 | P90 | Outliers | RTT Mean |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | P10 | P90 | Outliers | RTT Mean | TTL Mean | Ping Loss % |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for s in summaries:
         t = s["throughput"]
         r = s["rtt"]
+        ttl = s["ttl"]
+        pfl = s["preflight_loss"]
         lines.append(
-            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {p10} | {p90} | {outliers} | {rtt} |".format(
+            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {p10} | {p90} | {outliers} | {rtt} | {ttl} | {pfl} |".format(
                 host=s["host"],
                 protocol=s["protocol"],
                 direction=s["direction"],
@@ -329,6 +451,8 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
                 p90=fmt_bps(t["p90"]),
                 outliers=len(t["outliers"]),
                 rtt=f"{r['mean']:.3f} ms" if r["mean"] is not None else "n/a",
+                ttl=f"{ttl['mean']:.1f}" if ttl["mean"] is not None else "n/a",
+                pfl=f"{pfl['mean']:.2f}%" if pfl["mean"] is not None else "n/a",
             )
         )
 
@@ -379,6 +503,8 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
     assets_dir = os.path.join(run_dir, "report_assets")
     os.makedirs(assets_dir, exist_ok=True)
 
+    graphs = []
+
     # Bar chart for TCP uplink mean throughput
     tcp_uplink = []
     for s in summaries:
@@ -389,16 +515,8 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
             })
     if tcp_uplink:
         out_svg = os.path.join(assets_dir, "tcp_uplink_mean.svg")
-        svg_bar_chart(
-            [{"label": i["label"], "value": i["value"]} for i in tcp_uplink],
-            "TCP Uplink Mean Throughput (Gbps)",
-            "value",
-            out_svg,
-            unit="Gbps",
-        )
-        lines.append("")
-        lines.append("## Graphs")
-        lines.append(f"![TCP Uplink Mean](report_assets/tcp_uplink_mean.svg)")
+        svg_bar_chart(tcp_uplink, "TCP Uplink Mean Throughput (Gbps)", "value", out_svg, unit="Gbps")
+        graphs.append(("TCP Uplink Mean", "report_assets/tcp_uplink_mean.svg"))
 
     # Bar chart for TCP downlink
     tcp_down = []
@@ -410,14 +528,8 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
             })
     if tcp_down:
         out_svg = os.path.join(assets_dir, "tcp_downlink_mean.svg")
-        svg_bar_chart(
-            [{"label": i["label"], "value": i["value"]} for i in tcp_down],
-            "TCP Downlink Mean Throughput (Gbps)",
-            "value",
-            out_svg,
-            unit="Gbps",
-        )
-        lines.append(f"![TCP Downlink Mean](report_assets/tcp_downlink_mean.svg)")
+        svg_bar_chart(tcp_down, "TCP Downlink Mean Throughput (Gbps)", "value", out_svg, unit="Gbps")
+        graphs.append(("TCP Downlink Mean", "report_assets/tcp_downlink_mean.svg"))
 
     # UDP mean throughput
     udp = []
@@ -429,14 +541,47 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
             })
     if udp:
         out_svg = os.path.join(assets_dir, "udp_mean.svg")
-        svg_bar_chart(
-            [{"label": i["label"], "value": i["value"]} for i in udp],
-            "UDP Mean Throughput (Gbps)",
-            "value",
-            out_svg,
-            unit="Gbps",
-        )
-        lines.append(f"![UDP Mean](report_assets/udp_mean.svg)")
+        svg_bar_chart(udp, "UDP Mean Throughput (Gbps)", "value", out_svg, unit="Gbps")
+        graphs.append(("UDP Mean", "report_assets/udp_mean.svg"))
+
+    # RTT mean
+    rtt_bars = []
+    for s in summaries:
+        if s["rtt"]["mean"] is not None:
+            rtt_bars.append({
+                "label": (s.get("site") or s["host"])[:10],
+                "value": s["rtt"]["mean"],
+            })
+    if rtt_bars:
+        out_svg = os.path.join(assets_dir, "rtt_mean.svg")
+        svg_bar_chart(rtt_bars, "RTT Mean (ms)", "value", out_svg, unit="ms")
+        graphs.append(("RTT Mean", "report_assets/rtt_mean.svg"))
+
+    # UDP jitter mean
+    jitter_bars = []
+    for s in summaries:
+        if s["protocol"] == "udp" and s["jitter"]["mean"] is not None:
+            jitter_bars.append({
+                "label": (s.get("site") or s["host"])[:10],
+                "value": s["jitter"]["mean"],
+            })
+    if jitter_bars:
+        out_svg = os.path.join(assets_dir, "udp_jitter_mean.svg")
+        svg_bar_chart(jitter_bars, "UDP Jitter Mean (ms)", "value", out_svg, unit="ms")
+        graphs.append(("UDP Jitter Mean", "report_assets/udp_jitter_mean.svg"))
+
+    # UDP loss mean
+    loss_bars = []
+    for s in summaries:
+        if s["protocol"] == "udp" and s["loss"]["mean"] is not None:
+            loss_bars.append({
+                "label": (s.get("site") or s["host"])[:10],
+                "value": s["loss"]["mean"],
+            })
+    if loss_bars:
+        out_svg = os.path.join(assets_dir, "udp_loss_mean.svg")
+        svg_bar_chart(loss_bars, "UDP Loss Mean (%)", "value", out_svg, unit="%")
+        graphs.append(("UDP Loss Mean", "report_assets/udp_loss_mean.svg"))
 
     # RTT vs throughput scatter
     scatter_items = []
@@ -449,7 +594,16 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
     if scatter_items:
         out_svg = os.path.join(assets_dir, "rtt_vs_throughput.svg")
         svg_scatter(scatter_items, "RTT vs Throughput", out_svg)
-        lines.append(f"![RTT vs Throughput](report_assets/rtt_vs_throughput.svg)")
+        graphs.append(("RTT vs Throughput", "report_assets/rtt_vs_throughput.svg"))
+
+    if graphs:
+        lines.append("")
+        lines.append("## Graphs")
+        for title, path in graphs:
+            lines.append(f"![{title}]({path})")
+
+    # Write HTML report alongside markdown
+    write_html_report(run_dir, device, summaries, metrics, graphs)
 
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
