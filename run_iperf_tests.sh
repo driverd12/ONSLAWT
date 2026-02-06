@@ -78,8 +78,8 @@ while IFS= read -r test_json; do
   if [[ -z "$udp_bandwidth" ]]; then udp_bandwidth="0"; fi
   if [[ -z "$start_server" ]]; then start_server="true"; fi
 
-  # Only attempt SSH start if SSH info is explicitly provided.
-  if [[ -n "$ssh_user" || -n "$ssh_host" || -n "$ssh_key" || -n "$ssh_port" || -n "$ssh_opts" ]]; then
+  # Only attempt SSH start if SSH info is explicitly provided (ignore default port alone).
+  if [[ -n "$ssh_user" || -n "$ssh_host" || -n "$ssh_key" || -n "$ssh_opts" ]]; then
     if [[ -z "$ssh_user" ]]; then ssh_user="$USER"; fi
     if [[ -z "$ssh_host" ]]; then ssh_host="$server_host"; fi
   else
