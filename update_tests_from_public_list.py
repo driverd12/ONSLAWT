@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+import subprocess
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.request import Request, urlopen
@@ -165,6 +166,31 @@ def select_diverse(records: List[Dict[str, Any]], count: int) -> List[Dict[str, 
     return selected
 
 
+def verify_server(host: str, port: int, timeout_sec: int, duration: int) -> bool:
+    cmd = [
+        "iperf3",
+        "-c", host,
+        "-p", str(port),
+        "-t", str(duration),
+        "-P", "1",
+        "-J",
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout_sec, check=False)
+    except Exception:
+        return False
+    if res.returncode != 0:
+        return False
+    try:
+        data = json.loads(res.stdout.decode("utf-8", errors="ignore"))
+    except Exception:
+        return False
+    end = data.get("end", {})
+    sum_sent = end.get("sum_sent", {}) or {}
+    sum_recv = end.get("sum_received", {}) or {}
+    return ("bits_per_second" in sum_sent) or ("bits_per_second" in sum_recv)
+
+
 def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
@@ -213,6 +239,9 @@ def main() -> int:
     parser.add_argument("--udp-bandwidth", default="10G", help="UDP bandwidth to use")
     parser.add_argument("--out", default="tests.json", help="Output tests.json path")
     parser.add_argument("--cache-dir", default="data", help="Directory to store downloaded lists")
+    parser.add_argument("--verify", action="store_true", help="Verify servers with a quick iperf3 check")
+    parser.add_argument("--verify-timeout", type=int, default=8, help="Verification timeout seconds")
+    parser.add_argument("--verify-duration", type=int, default=2, help="Verification test duration seconds")
     args = parser.parse_args()
 
     os.makedirs(args.cache_dir, exist_ok=True)
@@ -262,6 +291,18 @@ def main() -> int:
 
     selected = select_diverse(deduped, args.count)
 
+    if args.verify:
+        verified = []
+        for r in deduped:
+            if len(verified) >= args.count:
+                break
+            host = r.get("host")
+            port = int(r.get("port") or 5201)
+            if verify_server(host, port, args.verify_timeout, args.verify_duration):
+                verified.append(r)
+        if verified:
+            selected = select_diverse(verified, args.count)
+
     tests = build_tests(selected, args.udp_bandwidth)
 
     output = {
@@ -290,6 +331,7 @@ def main() -> int:
             "run_mtu": False,
             "run_speedtest": False,
             "preflight_ping": True,
+            "runs_per_test": 2,
             "ping_count": 5,
             "ping_interval_ms": 200,
             "ping_pause_ms": 200,

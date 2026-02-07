@@ -74,6 +74,7 @@ while IFS= read -r test_json; do
   run_iperf=$(config_get "$test_json" '.run_iperf')
   run_timeout_sec=$(config_get "$test_json" '.run_timeout_sec')
   cooldown_sec=$(config_get "$test_json" '.cooldown_sec')
+  runs_per_test=$(config_get "$test_json" '.runs_per_test')
   adaptive_udp=$(config_get "$test_json" '.adaptive_udp')
   udp_start_bps=$(config_get "$test_json" '.udp_start_bps')
   udp_step_bps=$(config_get "$test_json" '.udp_step_bps')
@@ -119,6 +120,7 @@ while IFS= read -r test_json; do
   if [[ -z "$ping_count" ]]; then ping_count="5"; fi
   if [[ -z "$cooldown_sec" ]]; then cooldown_sec="5"; fi
   if [[ -z "$run_timeout_sec" ]]; then run_timeout_sec="$((duration + 20))"; fi
+  if [[ -z "$runs_per_test" ]]; then runs_per_test="1"; fi
   if [[ -z "$adaptive_udp" ]]; then adaptive_udp="false"; fi
   if [[ -z "$udp_start_bps" ]]; then udp_start_bps="1G"; fi
   if [[ -z "$udp_step_bps" ]]; then udp_step_bps="1G"; fi
@@ -166,15 +168,24 @@ while IFS= read -r test_json; do
 
   run_one() {
     local run_direction="$1"
+    local run_index="$2"
     local ts
     ts=$(date -Iseconds)
 
-    local outfile="$OUT_DIR/iperf_${name}_${run_direction}.json"
-    local rawfile="$OUT_DIR/iperf_${name}_${run_direction}.raw.json"
-    local errfile="$OUT_DIR/iperf_${name}_${run_direction}.stderr.log"
+    local suffix=""
+    if [[ -n "$run_index" && "$run_index" -gt 1 ]]; then
+      suffix="_run${run_index}"
+    fi
+    local outfile="$OUT_DIR/iperf_${name}_${run_direction}${suffix}.json"
+    local rawfile="$OUT_DIR/iperf_${name}_${run_direction}${suffix}.raw.json"
+    local errfile="$OUT_DIR/iperf_${name}_${run_direction}${suffix}.stderr.log"
 
     # Adaptive UDP ramp: steadily increase until pushback, then stop.
     if [[ "$protocol" == "udp" && "$adaptive_udp" == "true" ]]; then
+      if [[ "$run_index" -gt 1 ]]; then
+        log "[$name] Adaptive UDP already ran; skipping additional run_index=$run_index."
+        return 0
+      fi
       local out_adapt="$OUT_DIR/adaptive_udp_${name}_${run_direction}.json"
       local meta_json
       meta_json=$(jq -n \
@@ -259,12 +270,13 @@ while IFS= read -r test_json; do
         --arg gbps "$gbps" \
         --arg port_range "$port_range" \
         --arg rtt_avg_ms "$rtt_avg" \
+        --arg run_index "$run_index" \
         --arg raw_json_valid "false" \
         --arg error "iperf_failed" \
         '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
           server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
           notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
-          rtt_avg_ms: ($rtt_avg_ms|tonumber?), raw_json_valid: false, error:$error }')
+          rtt_avg_ms: ($rtt_avg_ms|tonumber?), run_index: ($run_index|tonumber?), raw_json_valid: false, error:$error }')
       jq -n --arg meta "$meta_fail" '{meta: ($meta|fromjson?), summary:{}, raw:""}' > "$outfile"
       return 1
     fi
@@ -281,6 +293,9 @@ while IFS= read -r test_json; do
     local raw_json_valid="true"
     if ! jq -e . "$parse_file" >/dev/null 2>&1; then
       raw_json_valid="false"
+    fi
+    if [[ "$raw_json_valid" != "true" ]]; then
+      log "[$name] iperf3 output was not valid JSON; raw output saved."
     fi
 
     local summary
@@ -322,13 +337,14 @@ while IFS= read -r test_json; do
       --arg gbps "$gbps" \
       --arg port_range "$port_range" \
       --arg rtt_avg_ms "$rtt_avg" \
+      --arg run_index "$run_index" \
       --arg ttl_avg "$ttl_avg" \
       --arg preflight_loss "$preflight_loss" \
       --arg raw_json_valid "$raw_json_valid" \
       '{name:$name, tool:$tool, protocol:$protocol, direction:$direction, timestamp:$timestamp,
         server_host:$server_host, duration:$duration|tonumber, parallel_streams:$parallel_streams|tonumber, iperf_port:$iperf_port|tonumber,
         notes:$notes, site:$site, country:$country, continent:$continent, provider:$provider, gbps:($gbps|tonumber?), port_range:$port_range,
-        rtt_avg_ms: ($rtt_avg_ms|tonumber?), ttl_avg: ($ttl_avg|tonumber?), preflight_loss: ($preflight_loss|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
+        rtt_avg_ms: ($rtt_avg_ms|tonumber?), ttl_avg: ($ttl_avg|tonumber?), preflight_loss: ($preflight_loss|tonumber?), run_index: ($run_index|tonumber?), raw_json_valid: ($raw_json_valid=="true") }')
 
     if [[ "$raw_json_valid" == "true" ]]; then
       jq -n --arg meta "$meta" --arg summary "$summary" --slurpfile result "$parse_file" \
@@ -347,23 +363,31 @@ while IFS= read -r test_json; do
 
   case "$direction" in
     uplink)
-      run_one "uplink" || true
-      sleep "$cooldown_sec"
+      for ((i=1; i<=runs_per_test; i++)); do
+        run_one "uplink" "$i" || true
+        sleep "$cooldown_sec"
+      done
       ;;
     downlink)
-      run_one "downlink" || true
-      sleep "$cooldown_sec"
+      for ((i=1; i<=runs_per_test; i++)); do
+        run_one "downlink" "$i" || true
+        sleep "$cooldown_sec"
+      done
       ;;
     bidirectional)
-      run_one "uplink" || true
-      sleep "$cooldown_sec"
-      run_one "downlink" || true
-      sleep "$cooldown_sec"
+      for ((i=1; i<=runs_per_test; i++)); do
+        run_one "uplink" "$i" || true
+        sleep "$cooldown_sec"
+        run_one "downlink" "$i" || true
+        sleep "$cooldown_sec"
+      done
       ;;
     *)
       log "[$name] Unknown direction '$direction'; defaulting to uplink."
-      run_one "uplink" || true
-      sleep "$cooldown_sec"
+      for ((i=1; i<=runs_per_test; i++)); do
+        run_one "uplink" "$i" || true
+        sleep "$cooldown_sec"
+      done
       ;;
   esac
 

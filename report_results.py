@@ -330,7 +330,7 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
     # Per-endpoint summary table
     lines.append("<h2>Per-Endpoint Summary (Throughput)</h2>")
     lines.append("<table><tr><th>Host</th><th>Protocol</th><th>Direction</th><th>Site</th><th>Provider</th>"
-                 "<th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>P10</th><th>P90</th><th>Outliers</th>"
+                 "<th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Outliers</th>"
                  "<th>RTT Mean</th><th>TTL Mean</th><th>Ping Loss %</th></tr>")
     for s in summaries:
         t = s["throughput"]
@@ -351,8 +351,6 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
             f"<td>{fmt_bps(t['median'])}</td>"
             f"<td>{fmt_bps(t['min'])}</td>"
             f"<td>{fmt_bps(t['max'])}</td>"
-            f"<td>{fmt_bps(t['p10'])}</td>"
-            f"<td>{fmt_bps(t['p90'])}</td>"
             f"<td>{len(t['outliers'])}</td>"
             f"<td>{rtt_str}</td>"
             f"<td>{ttl_str}</td>"
@@ -363,7 +361,7 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
 
     # Overall summary
     lines.append("<h2>Overall Summary (All Endpoints)</h2>")
-    lines.append("<table><tr><th>Protocol</th><th>Direction</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>P10</th><th>P90</th><th>Outliers</th></tr>")
+    lines.append("<table><tr><th>Protocol</th><th>Direction</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Outliers</th></tr>")
     by_pd: Dict[tuple, List[float]] = {}
     for m in metrics:
         key = (m.get("protocol"), m.get("direction"))
@@ -375,7 +373,6 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
             f"<tr><td>{proto}</td><td>{direction}</td>"
             f"<td>{fmt_bps(s['mean'])}</td><td>{fmt_bps(s['median'])}</td>"
             f"<td>{fmt_bps(s['min'])}</td><td>{fmt_bps(s['max'])}</td>"
-            f"<td>{fmt_bps(s['p10'])}</td><td>{fmt_bps(s['p90'])}</td>"
             f"<td>{len(s['outliers'])}</td></tr>"
         )
     lines.append("</table>")
@@ -429,15 +426,15 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
 
     # Summary table
     lines.append("## Per-Endpoint Summary (Throughput)")
-    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | P10 | P90 | Outliers | RTT Mean | TTL Mean | Ping Loss % |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | Outliers | RTT Mean | TTL Mean | Ping Loss % |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for s in summaries:
         t = s["throughput"]
         r = s["rtt"]
         ttl = s["ttl"]
         pfl = s["preflight_loss"]
         lines.append(
-            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {p10} | {p90} | {outliers} | {rtt} | {ttl} | {pfl} |".format(
+            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {outliers} | {rtt} | {ttl} | {pfl} |".format(
                 host=s["host"],
                 protocol=s["protocol"],
                 direction=s["direction"],
@@ -447,8 +444,6 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
                 median=fmt_bps(t["median"]),
                 minv=fmt_bps(t["min"]),
                 maxv=fmt_bps(t["max"]),
-                p10=fmt_bps(t["p10"]),
-                p90=fmt_bps(t["p90"]),
                 outliers=len(t["outliers"]),
                 rtt=f"{r['mean']:.3f} ms" if r["mean"] is not None else "n/a",
                 ttl=f"{ttl['mean']:.1f}" if ttl["mean"] is not None else "n/a",
@@ -486,8 +481,8 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
     # Overall summary by protocol+direction
     lines.append("")
     lines.append("## Overall Summary (All Endpoints)")
-    lines.append("| Protocol | Direction | Mean | Median | Min | Max | P10 | P90 | Outliers |")
-    lines.append("|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Protocol | Direction | Mean | Median | Min | Max | Outliers |")
+    lines.append("|---|---|---|---|---|---|---|")
     by_pd: Dict[tuple, List[float]] = {}
     for m in metrics:
         key = (m.get("protocol"), m.get("direction"))
@@ -496,7 +491,7 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
     for (proto, direction), vals in by_pd.items():
         s = summarize(vals)
         lines.append(
-            f"| {proto} | {direction} | {fmt_bps(s['mean'])} | {fmt_bps(s['median'])} | {fmt_bps(s['min'])} | {fmt_bps(s['max'])} | {fmt_bps(s['p10'])} | {fmt_bps(s['p90'])} | {len(s['outliers'])} |"
+            f"| {proto} | {direction} | {fmt_bps(s['mean'])} | {fmt_bps(s['median'])} | {fmt_bps(s['min'])} | {fmt_bps(s['max'])} | {len(s['outliers'])} |"
         )
 
     # Graphs

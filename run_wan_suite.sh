@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 DEVICE_CHOICE="${DEVICE_CHOICE:-}"
+PARALLEL_JOBS="${PARALLEL_JOBS:-1}"
 
 if [[ -z "$DEVICE_CHOICE" ]]; then
   echo "Select gateway for this run:"
@@ -32,7 +33,7 @@ if [[ -x "$SCRIPT_DIR/refresh_public_tests.sh" ]]; then
   "$SCRIPT_DIR/refresh_public_tests.sh"
 fi
 
-if [[ "${PARALLEL_JOBS:-2}" -gt 1 ]]; then
+if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
   "$SCRIPT_DIR/run_iperf_parallel.sh" -r "$RUN_ID"
 else
   "$SCRIPT_DIR/run_iperf_tests.sh" -r "$RUN_ID"
