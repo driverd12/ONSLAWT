@@ -28,10 +28,21 @@ case "$DEVICE_CHOICE" in
 
 RUN_ID="${DEVICE_LABEL}_$(date +"%Y%m%d_%H%M%S")"
 
+PROFILE="${PROFILE:-quick}"
 # Refresh public list for consistency
-if [[ -x "$SCRIPT_DIR/refresh_public_tests.sh" ]]; then
-  "$SCRIPT_DIR/refresh_public_tests.sh"
-fi
+case "$PROFILE" in
+  quick)
+    "$SCRIPT_DIR/refresh_quick_tests.sh"
+    ;;
+  high)
+    "$SCRIPT_DIR/refresh_high_tests.sh"
+    ;;
+  full|default|*)
+    if [[ -x "$SCRIPT_DIR/refresh_public_tests.sh" ]]; then
+      "$SCRIPT_DIR/refresh_public_tests.sh"
+    fi
+    ;;
+esac
 
 if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
   "$SCRIPT_DIR/run_iperf_parallel.sh" -r "$RUN_ID"

@@ -10,6 +10,7 @@ OUT_BASE="$SCRIPT_DIR/results"
 RUN_ID=""
 ONLY_TEST=""
 AUTO_REFRESH="${AUTO_REFRESH:-1}"
+MAX_TOTAL_SECONDS="${MAX_TOTAL_SECONDS:-1200}"
 
 usage() {
   cat <<USAGE
@@ -52,6 +53,7 @@ fi
 ensure_out_dir "$OUT_BASE" "$RUN_ID"
 
 log "Starting iperf3 tests using config: $CONFIG_PATH"
+START_EPOCH=$(date +%s)
 if [[ "$AUTO_REFRESH" == "1" && -x "$SCRIPT_DIR/update_tests_from_public_list.py" ]]; then
   log "AUTO_REFRESH=1, refreshing public server list before run..."
   if python3 "$SCRIPT_DIR/update_tests_from_public_list.py" --count 8 --continent "North America" --min-gbps 10 --udp-bandwidth "10G" --out "$CONFIG_PATH" --cache-dir "$SCRIPT_DIR/data"; then
@@ -62,6 +64,14 @@ if [[ "$AUTO_REFRESH" == "1" && -x "$SCRIPT_DIR/update_tests_from_public_list.py
 fi
 
 while IFS= read -r test_json; do
+  if [[ -n "$MAX_TOTAL_SECONDS" && "$MAX_TOTAL_SECONDS" -gt 0 ]]; then
+    now=$(date +%s)
+    elapsed=$((now - START_EPOCH))
+    if [[ "$elapsed" -ge "$MAX_TOTAL_SECONDS" ]]; then
+      log "Max total runtime (${MAX_TOTAL_SECONDS}s) reached; stopping further tests."
+      break
+    fi
+  fi
   name=$(config_get "$test_json" '.name')
   server_host=$(config_get "$test_json" '.server_host')
   protocol=$(config_get "$test_json" '.protocol')

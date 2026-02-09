@@ -239,6 +239,18 @@ def main() -> int:
     parser.add_argument("--udp-bandwidth", default="10G", help="UDP bandwidth to use")
     parser.add_argument("--out", default="tests.json", help="Output tests.json path")
     parser.add_argument("--cache-dir", default="data", help="Directory to store downloaded lists")
+    parser.add_argument("--protocols", default="tcp,udp", help="Comma-separated protocols to include (tcp,udp)")
+    parser.add_argument("--duration", type=int, default=15, help="Test duration seconds")
+    parser.add_argument("--parallel", type=int, default=4, help="Parallel streams")
+    parser.add_argument("--direction", default="bidirectional", help="Direction: uplink/downlink/bidirectional")
+    parser.add_argument("--runs-per-test", type=int, default=1, help="Repeat count per test")
+    parser.add_argument("--adaptive-udp", action="store_true", help="Enable adaptive UDP ramp")
+    parser.add_argument("--udp-start", default="2G", help="Adaptive UDP start")
+    parser.add_argument("--udp-step", default="2G", help="Adaptive UDP step")
+    parser.add_argument("--udp-max", default="10G", help="Adaptive UDP max")
+    parser.add_argument("--udp-loss", type=float, default=1.0, help="Adaptive UDP loss threshold")
+    parser.add_argument("--udp-jitter", type=float, default=5.0, help="Adaptive UDP jitter threshold")
+    parser.add_argument("--udp-drop", type=float, default=5.0, help="Adaptive UDP throughput drop threshold")
     parser.add_argument("--verify", action="store_true", help="Verify servers with a quick iperf3 check")
     parser.add_argument("--verify-timeout", type=int, default=8, help="Verification timeout seconds")
     parser.add_argument("--verify-duration", type=int, default=2, help="Verification test duration seconds")
@@ -303,7 +315,10 @@ def main() -> int:
         if verified:
             selected = select_diverse(verified, args.count)
 
+    protocols = [p.strip().lower() for p in args.protocols.split(",") if p.strip()]
     tests = build_tests(selected, args.udp_bandwidth)
+    if protocols:
+        tests = [t for t in tests if t.get("protocol") in protocols]
 
     output = {
         "meta": {
@@ -319,9 +334,9 @@ def main() -> int:
         },
         "defaults": {
             "protocol": "tcp",
-            "direction": "bidirectional",
-            "duration": 15,
-            "parallel_streams": 4,
+            "direction": args.direction,
+            "duration": args.duration,
+            "parallel_streams": args.parallel,
             "iperf_port": 5201,
             "udp_bandwidth": args.udp_bandwidth,
             "start_server": False,
@@ -331,20 +346,20 @@ def main() -> int:
             "run_mtu": False,
             "run_speedtest": False,
             "preflight_ping": True,
-            "runs_per_test": 2,
+            "runs_per_test": args.runs_per_test,
             "ping_count": 5,
             "ping_interval_ms": 200,
             "ping_pause_ms": 200,
             "ping_bursts": 1,
             "cooldown_sec": 3,
             "run_timeout_sec": 45,
-            "adaptive_udp": True,
-            "udp_start_bps": "2G",
-            "udp_step_bps": "2G",
-            "udp_max_bps": "10G",
-            "udp_loss_threshold": 1.0,
-            "udp_jitter_threshold": 5.0,
-            "udp_drop_threshold": 5.0,
+            "adaptive_udp": bool(args.adaptive_udp),
+            "udp_start_bps": args.udp_start,
+            "udp_step_bps": args.udp_step,
+            "udp_max_bps": args.udp_max,
+            "udp_loss_threshold": args.udp_loss,
+            "udp_jitter_threshold": args.udp_jitter,
+            "udp_drop_threshold": args.udp_drop,
             "mtr_cycles": 10,
             "mtu_test": False,
             "mtu_max_size": 1472,

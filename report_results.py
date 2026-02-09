@@ -331,7 +331,7 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
     lines.append("<h2>Per-Endpoint Summary (Throughput)</h2>")
     lines.append("<table><tr><th>Host</th><th>Protocol</th><th>Direction</th><th>Site</th><th>Provider</th>"
                  "<th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Outliers</th>"
-                 "<th>RTT Mean</th><th>TTL Mean</th><th>Ping Loss %</th></tr>")
+                 "<th>RTT Mean</th><th>TTL Mean</th><th>Ping Loss %</th><th>Status</th></tr>")
     for s in summaries:
         t = s["throughput"]
         r = s["rtt"]
@@ -340,6 +340,7 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
         rtt_str = f"{r['mean']:.3f} ms" if r["mean"] is not None else "n/a"
         ttl_str = f"{ttl['mean']:.1f}" if ttl["mean"] is not None else "n/a"
         pfl_str = f"{pfl['mean']:.2f}%" if pfl["mean"] is not None else "n/a"
+        status = "ok" if t["mean"] is not None else "failed"
         lines.append(
             "<tr>"
             f"<td>{s['host']}</td>"
@@ -355,6 +356,7 @@ def write_html_report(run_dir: str, device: str, summaries: List[Dict[str, Any]]
             f"<td>{rtt_str}</td>"
             f"<td>{ttl_str}</td>"
             f"<td>{pfl_str}</td>"
+            f"<td>{status}</td>"
             "</tr>"
         )
     lines.append("</table>")
@@ -426,15 +428,16 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
 
     # Summary table
     lines.append("## Per-Endpoint Summary (Throughput)")
-    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | Outliers | RTT Mean | TTL Mean | Ping Loss % |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Host | Protocol | Direction | Site | Provider | Mean | Median | Min | Max | Outliers | RTT Mean | TTL Mean | Ping Loss % | Status |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for s in summaries:
         t = s["throughput"]
         r = s["rtt"]
         ttl = s["ttl"]
         pfl = s["preflight_loss"]
+        status = "ok" if t["mean"] is not None else "failed"
         lines.append(
-            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {outliers} | {rtt} | {ttl} | {pfl} |".format(
+            "| {host} | {protocol} | {direction} | {site} | {provider} | {mean} | {median} | {minv} | {maxv} | {outliers} | {rtt} | {ttl} | {pfl} | {status} |".format(
                 host=s["host"],
                 protocol=s["protocol"],
                 direction=s["direction"],
@@ -448,6 +451,7 @@ def write_report(run_dir: str, device: str, metrics: List[Dict[str, Any]], summa
                 rtt=f"{r['mean']:.3f} ms" if r["mean"] is not None else "n/a",
                 ttl=f"{ttl['mean']:.1f}" if ttl["mean"] is not None else "n/a",
                 pfl=f"{pfl['mean']:.2f}%" if pfl["mean"] is not None else "n/a",
+                status=status,
             )
         )
 
